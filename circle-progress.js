@@ -56,7 +56,7 @@ st.textContent = '.circle-progress {\n' +
     '      }'
 document.head.appendChild(st)
 
-window['$circle_loader'] = function(el, col, backcol) {
+window['$circle_progress'] = function(el, col, backcol) {
 
    el.innerHTML = '<div class="circle-progress"><div><div class="left"></div><div class="right"></div><div class="left-back"></div><div class="right-back"></div></div><div class="text">0</div></div>'
    el = el.children[0]
@@ -105,8 +105,11 @@ window['$circle_loader'] = function(el, col, backcol) {
    return {
       el: el,
       val: 0,
+      lastVal: 0,
+      fxStartTime: null,
       backcol: backcol,
       update: function(progress) {
+         var prev_val = this.val
          progress = Math.max(0, Math.min(1, progress))
          this.val = progress
          
@@ -119,64 +122,133 @@ window['$circle_loader'] = function(el, col, backcol) {
          var right = this.el.querySelector('.right')
          
          if (progress <= 0.5) {
-            if (this.el.children[0].style.width == '') {
-               var w = this.el.clientWidth
-               
-               if (this.backcol == 'transparent') {
-                  this.el.children[0].style.width = (w / 2) + 'px'
-                  this.el.children[0].style.left = (w / 2) + 'px'
+            
+            this.fxStartTime = +(new Date())
+            
+            var deg = -180 + 360 * progress
+            
+            var st = left.currentStyle || getComputedStyle(left, '')
+            var t = parseFloat(st.transitionDuration) * 1000
+            
+            t = t - (this.fxStartTime ? Math.max(0, +(new Date()) - this.fxStartTime) : 0)
+            t = this.lastVal > 0.5 ? t : 0
+            
+            if (t > 0) {
+               left_back.style.zIndex = this.backcol != 'transparent' ? '' : '-1'
+               right_back.style.zIndex = ''
+            }
+            
+            if (this.backcol != 'transparent') right_back.style.zIndex = ''
+            
+            left.style.transform = 'rotate(180deg)'
+            
+            var self = this
+            
+            setTimeout(function() {
+               if (self.el.children[0].style.width == '') {
+                  var w = self.el.clientWidth
                   
-                  for (var i = 0; i < this.el.children[0].children.length; i++) {
-                     this.el.children[0].children[i].style.width = w + 'px'
-                     this.el.children[0].children[i].style.marginLeft = -(w / 2) + 'px'
+                  if (self.backcol == 'transparent') {
+                     self.el.children[0].style.width = (w / 2) + 'px'
+                     self.el.children[0].style.left = (w / 2) + 'px'
+                     
+                     for (var i = 0; i < self.el.children[0].children.length; i++) {
+                        self.el.children[0].children[i].style.width = w + 'px'
+                        self.el.children[0].children[i].style.marginLeft = -(w / 2) + 'px'
+                     }
+                  } else {
+                     left_back.style.zIndex = '1'
+                     right_back.style.zIndex = ''
+                     left_back.style.opacity = '1'
+                     right_back.style.opacity = '1'
                   }
+                  
                } else {
                   left_back.style.zIndex = '1'
+                  left.style.zIndex = ''
+                  right.style.zIndex = '1'
                   right_back.style.zIndex = ''
                   left_back.style.opacity = '1'
                   right_back.style.opacity = '1'
                }
-               
-            } else {
+            
+               left.style.opacity = '0'
                left_back.style.zIndex = '1'
-               left.style.zIndex = ''
-               right.style.zIndex = '1'
-               right_back.style.zIndex = ''
-               left_back.style.opacity = '1'
-               right_back.style.opacity = '1'
-            }
-            
-            var deg = -180 + 360 * progress
-            left.style.opacity = '0'
-            left.style.transform = 'rotate(180deg)'
-            
-            right.style.opacity = '1'
-            right.style.transform = 'rotate(' + deg + 'deg)'
-         } else {
-            if (this.el.children[0].style.width != '' && backcol == 'transparent') {
-               this.el.children[0].style.width = ''
-               this.el.children[0].style.left = ''
-               for (var i = 0; i < this.el.children[0].children.length; i++) {
-                  this.el.children[0].children[i].style.width = ''
-                  this.el.children[0].children[i].style.marginLeft = ''
+               right_back.style.zIndex = self.backcol != 'transparent' ? '' : '-1'
+               
+               right.style.opacity = '1'
+               right.style.transform = 'rotate(' + deg + 'deg)'
+               
+               if (!right.ontransitionend) {
+                  left.ontransitionend = null
+                  this.fxStartTime = +(new Date())
+                  var val = self.val
+                  var target = val < 0.5 ? right : left
+                  target.ontransitionend = function() {
+                     self.lastVal = val
+                     self.fxStartTime = null
+                     this.ontransitionend = null
+                  }
                }
-               left_back.style.zIndex = '-1'
-            } else if (backcol != 'transparent') {
-               left_back.style.zIndex = '0'
-               left.style.zIndex = '1'
-               right.style.zIndex = '1'
-               right_back.style.zIndex = ''
-               left_back.style.opacity = '1'
-               right_back.style.opacity = '1'
+            }, t)
+         } else {
+
+            var deg = 180 + 360 * (progress - 0.5)
+            
+            var st = right.currentStyle || getComputedStyle(right, '')
+            var t = parseFloat(st.transitionDuration) * 1000
+            
+            t = t - (this.fxStartTime ? Math.max(0, +(new Date()) - this.fxStartTime) : 0)
+            t = this.lastVal < 0.5 ? t : 0
+            
+            if (t > 0) {
+               left_back.style.zIndex = '1'
+               right_back.style.zIndex = this.backcol != 'transparent' ? '' : '-1'
             }
+            
+            if (this.backcol != 'transparent') left_back.style.zIndex = '1'
             
             right.style.opacity = '1'
             right.style.transform = 'rotate(0deg)'
-         
-            var deg = 180 + 360 * (progress - 0.5)
             
-            left.style.opacity = '1'
-            left.style.transform = 'rotate(' + deg + 'deg)'
+            var self = this
+            
+            setTimeout(function() {
+            
+               if (self.el.children[0].style.width != '' && self.backcol == 'transparent') {
+                  self.el.children[0].style.width = ''
+                  self.el.children[0].style.left = ''
+                  for (var i = 0; i < self.el.children[0].children.length; i++) {
+                     self.el.children[0].children[i].style.width = ''
+                     self.el.children[0].children[i].style.marginLeft = ''
+                  }
+                  left_back.style.zIndex = '-1'
+               } else if (backcol != 'transparent') {
+                  left_back.style.zIndex = '0'
+                  left.style.zIndex = '1'
+                  right.style.zIndex = '1'
+                  right_back.style.zIndex = ''
+                  left_back.style.opacity = '1'
+                  right_back.style.opacity = '1'
+               }
+            
+               left_back.style.zIndex = backcol != 'transparent' ? '0' : '-1'
+               right_back.style.zIndex = self.backcol != 'transparent' ? '' : '-1'
+               right.style.zIndex = '1'
+               left.style.opacity = '1'
+               left.style.transform = 'rotate(' + deg + 'deg)'
+               
+               if (!left.ontransitionend) {
+                  right.ontransitionend = null
+                  this.fxStartTime = +(new Date())
+                  var val = self.val
+                  left.ontransitionend = function() {
+                     self.lastVal = val
+                     self.fxStartTime = null
+                     this.ontransitionend = null
+                  }
+               }
+            }, t)
          }
          return this
       },
